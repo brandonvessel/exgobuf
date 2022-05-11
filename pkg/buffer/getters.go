@@ -164,7 +164,7 @@ func (b *Buf) ReadBytes(length int) ([]byte, error) {
 }
 
 // GetLength reads the length of a blob from the buffer.
-func (b *Buf) ReadLength(lengthType LenType) (int, error) {
+func (b *Buf) ReadBlobLength(lengthType LenType) (int, error) {
 	// get length
 	var length int
 
@@ -223,6 +223,34 @@ func (b *Buf) ReadLength(lengthType LenType) (int, error) {
 	return length, nil
 }
 
+// GetLengthByteCount returns the number of bytes needed to read the length of a blob.
+func (b *Buf) GetBlobLengthByteCount(lengthType LenType) (int, error) {
+	// get length
+	var length int
+
+	switch lengthType {
+	case Uint8:
+		length = 1
+	case Uint16:
+		length = 2
+	case Uint32:
+		length = 4
+	case Uint64:
+		length = 8
+	case Int8:
+		length = 1
+	case Int16:
+		length = 2
+	case Int32:
+		length = 4
+	case Int64:
+		length = 8
+	default:
+		return 0, fmt.Errorf("invalid length type: %d", lengthType)
+	}
+	return length, nil
+}
+
 // GetBlob reads a blob from the buffer by decoding the length information and then reading the blob length.
 func (b *Buf) ReadBlob() ([]byte, error) {
 	// types
@@ -238,7 +266,7 @@ func (b *Buf) ReadBlob() ([]byte, error) {
 	var lengthType LenType = LenType(uint8(val))
 
 	// get length
-	length, err := b.ReadLength(lengthType)
+	length, err := b.ReadBlobLength(lengthType)
 
 	// check if we have an error
 	if err != nil {
@@ -247,6 +275,59 @@ func (b *Buf) ReadBlob() ([]byte, error) {
 
 	// read blob
 	return b.ReadBytes(length)
+}
+
+// ReadBlockWithHeader reads a blob from the buffer and returns the header with the blob.
+func (b *Buf) ReadBlobWithHeader() ([]byte, error) {
+	// types
+	var val byte
+	var err error
+
+	// get length type
+	val, err = b.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	var lengthType LenType = LenType(uint8(val))
+
+	var lengthByte byte = byte(lengthType)
+
+	// get length byte count
+	lengthByteCount, err := b.GetBlobLengthByteCount(lengthType)
+	if err != nil {
+		return nil, err
+	}
+
+	// get pointer position
+	pointerPosition := b.GetPtr()
+
+	// get length
+	length, err := b.ReadBlobLength(lengthType)
+	if err != nil {
+		return nil, err
+	}
+
+	// reset pointer to pointer position
+	err = b.SetPtr(pointerPosition)
+	if err != nil {
+		return nil, err
+	}
+
+	// read length bytes
+	lengthBytes, err := b.ReadBytes(lengthByteCount)
+	if err != nil {
+		return nil, err
+	}
+
+	// read blob bytes
+	blobBytes, err := b.ReadBytes(length)
+	if err != nil {
+		return nil, err
+	}
+
+	// return length type, length bytes, and blob bytes
+	return append(append([]byte{lengthByte}, lengthBytes...), blobBytes...), nil
 }
 
 // ReadBlobAt reads the nth blob from the buffer.
