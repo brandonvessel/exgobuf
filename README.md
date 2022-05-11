@@ -6,3 +6,5 @@ Import the buffer package with
 ```go
 import "github.com/brandonvessel/ezgobuf/pkg/buffer"
 ```
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/brandonvessel/ezgobuf.svg)](https://pkg.go.dev/github.com/brandonvessel/ezgobuf)
